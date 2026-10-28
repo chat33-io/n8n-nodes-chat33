@@ -5,7 +5,7 @@ to Instagram, Facebook, TikTok, YouTube, X, LinkedIn, Bluesky and Threads, read
 and answer Instagram, Facebook and WhatsApp DMs, and start workflows when a DM
 arrives or a lead is captured.
 
-![Chat33 Trigger answering new DMs with Conversation → Reply](https://raw.githubusercontent.com/chat33-io/n8n-nodes-chat33/main/docs/images/dm-auto-reply-workflow.png)
+![Chat33 Trigger answering new DMs with Conversation → Reply](https://raw.githubusercontent.com/chat33-io/n8n-nodes-chat33/main/docs/images/dm-auto-reply-workflow.jpg)
 
 ## Installation
 
@@ -43,7 +43,7 @@ flow). Answer with **Conversation → Reply** using `data.conversationId`.
 - Instagram and Facebook allow replies within 24 hours of the contact's last
   message (`data.replyWindowEndsAt`).
 
-<img src="https://raw.githubusercontent.com/chat33-io/n8n-nodes-chat33/main/docs/images/conversation-reply.png" alt="Conversation → Reply settings" width="420">
+<img src="https://raw.githubusercontent.com/chat33-io/n8n-nodes-chat33/main/docs/images/conversation-reply.jpg" alt="Conversation → Reply settings" width="420">
 
 ### Media size limits
 
@@ -108,7 +108,7 @@ needs hand-written JSON:
 - **Threads** — topic tag, reply permissions, poll (2 to 4 options), link card
   URL and sharing to your Instagram Story.
 
-<img src="https://raw.githubusercontent.com/chat33-io/n8n-nodes-chat33/main/docs/images/threads-settings.png" alt="Threads settings on Post → Create" width="420">
+<img src="https://raw.githubusercontent.com/chat33-io/n8n-nodes-chat33/main/docs/images/threads-settings.jpg" alt="Threads settings on Post → Create" width="420">
 
 Each collection also has a *Caption* field that overrides the shared text for
 that platform alone, so one node can send a different message to each network.
