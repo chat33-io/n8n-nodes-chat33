@@ -984,7 +984,7 @@ export class Chat33 implements INodeType {
         }
 
         if (resource === 'post' && operation === 'get') {
-          const postId = this.getNodeParameter('postId', i) as string;
+          const postId = encodeURIComponent(this.getNodeParameter('postId', i) as string);
           responseData = await chat33ApiRequest.call(this, 'GET', `/api/v1/posts/${postId}`);
         }
         if (resource === 'post' && operation === 'getMany') {
@@ -993,15 +993,15 @@ export class Chat33 implements INodeType {
           responseData = listItems(res);
         }
         if (resource === 'post' && operation === 'delete') {
-          const postId = this.getNodeParameter('postId', i) as string;
+          const postId = encodeURIComponent(this.getNodeParameter('postId', i) as string);
           responseData = await chat33ApiRequest.call(this, 'DELETE', `/api/v1/posts/${postId}`);
         }
         if (resource === 'post' && operation === 'duplicate') {
-          const postId = this.getNodeParameter('postId', i) as string;
+          const postId = encodeURIComponent(this.getNodeParameter('postId', i) as string);
           responseData = await chat33ApiRequest.call(this, 'POST', `/api/v1/posts/${postId}/duplicate`);
         }
         if (resource === 'post' && operation === 'getLogs') {
-          const postId = this.getNodeParameter('postId', i) as string;
+          const postId = encodeURIComponent(this.getNodeParameter('postId', i) as string);
           const res = await chat33ApiRequest.call(this, 'GET', `/api/v1/posts/${postId}/logs`);
           responseData = listItems(res);
         }
