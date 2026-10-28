@@ -29,7 +29,9 @@ jobs:
         with:
           node-version: 'lts/*'
           cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
+          # No registry-url: it makes setup-node write a placeholder
+          # NODE_AUTH_TOKEN into .npmrc, and npm then publishes with that
+          # instead of the OIDC trusted publisher (E404).
 
       # Trusted Publishing needs npm 11.5.1 or later.
       - name: Update npm
