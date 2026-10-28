@@ -1,0 +1,62 @@
+{
+  "name": "n8n-nodes-chat33",
+  "version": "0.5.0",
+  "description": "n8n community node for Chat33: schedule and publish social posts to Instagram, Facebook, TikTok, YouTube, X, LinkedIn, Bluesky and Threads via the Chat33 API",
+  "keywords": [
+    "n8n-community-node-package",
+    "chat33",
+    "social-media",
+    "scheduling",
+    "instagram",
+    "dm",
+    "inbox"
+  ],
+  "license": "MIT",
+  "homepage": "https://chat33.io/developers",
+  "author": {
+    "name": "Chat33",
+    "email": "nemanja@chat33.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chat33-io/n8n-nodes-chat33.git"
+  },
+  "scripts": {
+    "build": "n8n-node build",
+    "build:watch": "tsc --watch",
+    "dev": "n8n-node dev",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
+    "release": "n8n-node release",
+    "prepublishOnly": "n8n-node prerelease",
+    "test": "jest"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/Chat33Api.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Chat33/Chat33.node.js",
+      "dist/nodes/Chat33/Chat33Trigger.node.js"
+    ],
+    "strict": true
+  },
+  "devDependencies": {
+    "@n8n/node-cli": "^0.54.4",
+    "@types/jest": "^29.5.12",
+    "eslint": "^9.39.4",
+    "jest": "^29.7.0",
+    "n8n-workflow": "^1.48.0",
+    "prettier": "^3.8.3",
+    "release-it": "^20.2.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.5.3"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
