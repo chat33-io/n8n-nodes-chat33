@@ -36,6 +36,14 @@ export function buildCreatePostBody(params: IDataObject): IDataObject {
   for (const key of ['mediaType', 'coverImageUrl', 'callbackUrl', 'timezone']) {
     if (opts[key]) body[key] = opts[key];
   }
+  // Idempotency: Chat33 returns the existing post for a repeated externalRef
+  // instead of publishing again. A user-supplied reference wins; otherwise the
+  // node passes one derived from the execution, so n8n's Retry On Fail never
+  // publishes the same item twice.
+  const ref = typeof opts.externalRef === 'string' && opts.externalRef.trim()
+    ? opts.externalRef.trim()
+    : params.defaultExternalRef;
+  if (ref) body.externalRef = ref;
   // The node refuses invalid JSON before calling this (it owns the error type).
   const platformConfig = parsePlatformConfigJson(opts.platformConfigJson);
   if (platformConfig) body.platformConfig = platformConfig;
@@ -227,7 +235,16 @@ export async function waitForPostsDelivery(
   while (pending.size > 0 && deps.now() < deadline) {
     await deps.sleep(intervalMs);
     for (const [index, id] of Array.from(pending.entries())) {
-      const fresh = await deps.fetchPost(id);
+      // The post already exists. A failed status check (429, 5xx, network)
+      // must not fail the node: n8n's Retry On Fail would then run Create
+      // again and publish a duplicate. Keep the last known state and retry
+      // on the next poll.
+      let fresh: IDataObject;
+      try {
+        fresh = await deps.fetchPost(id);
+      } catch {
+        continue;
+      }
       result[index] = { ...result[index], ...fresh };
       if (TERMINAL_POST_STATUSES.includes(String(fresh.status))) pending.delete(index);
     }

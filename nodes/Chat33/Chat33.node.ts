@@ -327,6 +327,14 @@ export class Chat33 implements INodeType {
             default: '',
           },
           {
+            displayName: 'External Reference',
+            name: 'externalRef',
+            type: 'string',
+            default: '',
+            description:
+              'Your own ID for this post (e.g. a row or order ID). Chat33 publishes a reference once per channel and returns the existing post on repeats. Leave empty and the node uses one per execution and item, so Retry On Fail never posts twice.',
+          },
+          {
             displayName: 'Media Type',
             name: 'mediaType',
             type: 'options',
@@ -961,6 +969,8 @@ export class Chat33 implements INodeType {
             linkedinSettings: this.getNodeParameter('linkedinSettings', i, {}) as IDataObject,
             blueskySettings: this.getNodeParameter('blueskySettings', i, {}) as IDataObject,
             threadsSettings: this.getNodeParameter('threadsSettings', i, {}) as IDataObject,
+            defaultExternalRef:
+              operation === 'create' ? executionExternalRef(this, i) : undefined,
           });
           const endpoint = operation === 'create' ? '/api/v1/posts' : '/api/v1/posts/validate';
           responseData = await chat33ApiRequest.call(this, 'POST', endpoint, body);
@@ -1085,4 +1095,23 @@ export class Chat33 implements INodeType {
     }
     return [returnData];
   }
+}
+
+/**
+ * One reference per execution, node run and item. Retry On Fail repeats the
+ * same run (same $runIndex), so a retry is recognised by Chat33 and returns
+ * the post it already made; a loop runs the node again with a new $runIndex,
+ * so each pass still publishes. Undefined when n8n can't tell us the run.
+ */
+function executionExternalRef(ctx: IExecuteFunctions, itemIndex: number): string | undefined {
+  const executionId = ctx.getExecutionId();
+  if (!executionId) return undefined;
+  let runIndex: unknown = 0;
+  try {
+    runIndex = ctx.evaluateExpression('{{ $runIndex }}', itemIndex);
+  } catch {
+    runIndex = 0;
+  }
+  const ref = `n8n:${executionId}:${ctx.getNode().id}:${String(runIndex)}:${itemIndex}`;
+  return /^[A-Za-z0-9:._-]{1,200}$/.test(ref) ? ref : undefined;
 }

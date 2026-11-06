@@ -459,3 +459,38 @@ describe('buildCreatePostBody — Bluesky and Threads', () => {
     expect(unset.platformConfig).toBeUndefined();
   });
 });
+
+describe('duplicate protection (0.5.1)', () => {
+  it('sends the execution reference as externalRef', () => {
+    const body = buildCreatePostBody({ accountIds: ['a'], text: 'hi', defaultExternalRef: 'n8n:1:node:0:0' });
+    expect(body.externalRef).toBe('n8n:1:node:0:0');
+  });
+
+  it('prefers a user-supplied External Reference', () => {
+    const body = buildCreatePostBody({
+      accountIds: ['a'], text: 'hi', defaultExternalRef: 'n8n:1:node:0:0',
+      additionalOptions: { externalRef: ' order-42 ' },
+    });
+    expect(body.externalRef).toBe('order-42');
+  });
+
+  it('a failed status check during the wait does not throw', async () => {
+    let clock = 0;
+    let calls = 0;
+    const result = await waitForPostsDelivery(
+      [{ id: 'p1', status: 'QUEUED' }],
+      { maxWaitMs: 60_000 },
+      {
+        fetchPost: async () => {
+          calls++;
+          if (calls === 1) throw new Error('429 Too Many Requests');
+          return { id: 'p1', status: 'PUBLISHED', externalPostUrl: 'https://x/p1' };
+        },
+        sleep: async (ms: number) => { clock += ms; },
+        now: () => clock,
+      },
+    );
+    expect(calls).toBe(2);
+    expect(result[0].status).toBe('PUBLISHED');
+  });
+});
