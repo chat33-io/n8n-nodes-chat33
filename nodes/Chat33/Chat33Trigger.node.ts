@@ -36,7 +36,7 @@ export class Chat33Trigger implements INodeType {
     properties: [
       {
         displayName:
-          'Chat33 sends events to one webhook per workspace. Activating this trigger takes that slot, so it refuses to start while another URL (a custom bot, another workflow) is saved in Chat33 → Settings → Webhooks. The API key needs the inbox:read and inbox:write scopes.',
+          'Chat33 sends events to one webhook per workspace. Activating this trigger takes that slot, so it refuses to start while another URL (a custom bot, another workflow) is saved in Chat33 → Settings → Webhooks.',
         name: 'notice',
         type: 'notice',
         default: '',

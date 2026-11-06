@@ -27,7 +27,8 @@ export class Chat33Api implements ICredentialType {
       type: 'string',
       typeOptions: { password: true },
       default: '',
-      description: 'Create one in Chat33 → Settings → API Keys',
+      description:
+        'Create one in Chat33 → Settings → API Keys. The Chat33 Trigger and the Conversation operations need the inbox:read and inbox:write scopes.',
     },
   ];
 

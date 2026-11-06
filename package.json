@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-chat33",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "n8n community node for Chat33: schedule and publish social posts to Instagram, Facebook, TikTok, YouTube, X, LinkedIn, Bluesky and Threads via the Chat33 API",
   "keywords": [
     "n8n-community-node-package",

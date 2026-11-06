@@ -9,7 +9,12 @@ import type {
   JsonObject,
 } from 'n8n-workflow';
 import { NodeApiError, NodeConnectionTypes, NodeOperationError, sleep } from 'n8n-workflow';
-import { collectConversations, conversationQuery } from './ConversationHelpers';
+import {
+  collectConversations,
+  collectMessages,
+  collectPosts,
+  conversationQuery,
+} from './ConversationHelpers';
 import { chat33ApiRequest, chat33UploadBuffer, listItems } from './GenericFunctions';
 import {
   buildCreatePostBody,
@@ -24,7 +29,11 @@ export class Chat33 implements INodeType {
     name: 'chat33',
     icon: { light: 'file:../../icons/chat33.png', dark: 'file:../../icons/chat33.dark.png' },
     group: ['output'],
-    version: 1,
+    // v2 (0.6.0): optional fields moved into collections and Return All on the
+    // list operations, as asked in the n8n review. v1 keeps its old fields so
+    // saved workflows (a scheduled post above all) behave exactly as before.
+    version: [1, 2],
+    defaultVersion: 2,
     subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
     description: 'Schedule and publish social posts via Chat33',
     defaults: { name: 'Chat33' },
@@ -185,7 +194,7 @@ export class Chat33 implements INodeType {
         name: 'messageLimit',
         type: 'number',
         typeOptions: { minValue: 1, maxValue: 100 },
-        displayOptions: { show: { resource: ['conversation'], operation: ['getMessages'] } },
+        displayOptions: { show: { resource: ['conversation'], operation: ['getMessages'], '@version': [1] } },
         default: 30,
         description: 'Max number of messages to return (the most recent ones)',
       },
@@ -193,9 +202,45 @@ export class Chat33 implements INodeType {
         displayName: 'Before',
         name: 'before',
         type: 'dateTime',
-        displayOptions: { show: { resource: ['conversation'], operation: ['getMessages'] } },
+        displayOptions: { show: { resource: ['conversation'], operation: ['getMessages'], '@version': [1] } },
         default: '',
         description: 'Only messages sent before this time, to page back through a long thread',
+      },
+      {
+        displayName: 'Return All',
+        name: 'returnAll',
+        type: 'boolean',
+        displayOptions: { show: { resource: ['conversation'], operation: ['getMessages'], '@version': [{ _cnd: { gte: 2 } }] } },
+        default: false,
+        description: 'Whether to return all results or only up to a given limit',
+      },
+      {
+        displayName: 'Limit',
+        name: 'limit',
+        type: 'number',
+        typeOptions: { minValue: 1 },
+        displayOptions: {
+          show: { resource: ['conversation'], operation: ['getMessages'], returnAll: [false], '@version': [{ _cnd: { gte: 2 } }] },
+        },
+        default: 50,
+        description: 'Max number of results to return',
+      },
+      {
+        displayName: 'Options',
+        name: 'messageOptions',
+        type: 'collection',
+        placeholder: 'Add option',
+        displayOptions: { show: { resource: ['conversation'], operation: ['getMessages'], '@version': [{ _cnd: { gte: 2 } }] } },
+        default: {},
+        options: [
+          {
+            displayName: 'Before',
+            name: 'before',
+            type: 'dateTime',
+            default: '',
+            description: 'Start from messages sent before this time instead of the newest one',
+          },
+        ],
       },
       // ── Account ──
       {
@@ -218,7 +263,7 @@ export class Chat33 implements INodeType {
         displayName: 'Platform',
         name: 'platform',
         type: 'options',
-        displayOptions: { show: { resource: ['account'], operation: ['getMany'] } },
+        displayOptions: { show: { resource: ['account'], operation: ['getMany'], '@version': [1] } },
         options: [
           { name: 'All', value: '' },
           { name: 'Bluesky', value: 'bluesky' },
@@ -232,6 +277,33 @@ export class Chat33 implements INodeType {
         ],
         default: '',
         description: 'Optionally filter by platform',
+      },
+      {
+        displayName: 'Filters',
+        name: 'accountFilters',
+        type: 'collection',
+        placeholder: 'Add filter',
+        displayOptions: { show: { resource: ['account'], operation: ['getMany'], '@version': [{ _cnd: { gte: 2 } }] } },
+        default: {},
+        options: [
+          {
+            displayName: 'Platform',
+            name: 'platform',
+            type: 'options',
+            options: [
+            { name: 'All', value: '' },
+            { name: 'Bluesky', value: 'bluesky' },
+            { name: 'Facebook', value: 'facebook' },
+            { name: 'Instagram', value: 'instagram' },
+            { name: 'LinkedIn', value: 'linkedin' },
+            { name: 'Threads', value: 'threads' },
+            { name: 'TikTok', value: 'tiktok' },
+            { name: 'X (Twitter)', value: 'x' },
+            { name: 'YouTube', value: 'youtube' },
+            ],
+            default: '',
+          },
+        ],
       },
       // ── Post ──
       {
@@ -283,7 +355,7 @@ export class Chat33 implements INodeType {
         displayName: 'Schedule At',
         name: 'scheduledAt',
         type: 'dateTime',
-        displayOptions: { show: { resource: ['post'], operation: ['create'] } },
+        displayOptions: { show: { resource: ['post'], operation: ['create'], '@version': [1] } },
         default: '',
         description: 'Leave empty to publish immediately',
       },
@@ -291,7 +363,7 @@ export class Chat33 implements INodeType {
         displayName: 'Wait for Delivery',
         name: 'waitForDelivery',
         type: 'boolean',
-        displayOptions: { show: { resource: ['post'], operation: ['create'] } },
+        displayOptions: { show: { resource: ['post'], operation: ['create'], '@version': [1] } },
         default: false,
         description:
           'Whether to wait until the post is actually live and return the final post URL. Multi-account posts wait for every account; a failure on one account does not fail the node — each post returns its own status. Skipped for scheduled posts.',
@@ -300,7 +372,7 @@ export class Chat33 implements INodeType {
         displayName: 'Max Wait Time (Seconds)',
         name: 'waitMaxSeconds',
         type: 'number',
-        displayOptions: { show: { resource: ['post'], operation: ['create'], waitForDelivery: [true] } },
+        displayOptions: { show: { resource: ['post'], operation: ['create'], waitForDelivery: [true], '@version': [1] } },
         default: 300,
         description:
           'Give up waiting after this long. Posts still publishing are returned in their current state (QUEUED/PUBLISHING) rather than as an error — TikTok occasionally takes up to an hour.',
@@ -331,8 +403,18 @@ export class Chat33 implements INodeType {
             name: 'externalRef',
             type: 'string',
             default: '',
+            displayOptions: { show: { '/operation': ['create'] } },
             description:
               'Your own ID for this post (e.g. a row or order ID). Chat33 publishes a reference once per channel and returns the existing post on repeats. Leave empty and the node uses one per execution and item, so Retry On Fail never posts twice.',
+          },
+          {
+            displayName: 'Max Wait Time (Seconds)',
+            name: 'waitMaxSeconds',
+            type: 'number',
+            default: 300,
+            description:
+              'Give up waiting after this long (only with Wait for Delivery). Posts still publishing are returned in their current state (QUEUED/PUBLISHING) rather than as an error — TikTok occasionally takes up to an hour.',
+            displayOptions: { show: { '/operation': ['create'], '@version': [{ _cnd: { gte: 2 } }] } },
           },
           {
             displayName: 'Media Type',
@@ -355,11 +437,28 @@ export class Chat33 implements INodeType {
               'Per-platform settings, e.g. TikTok consent or YouTube madeForKids. Schema: GET {baseUrl}/api/v1/openapi.',
           },
           {
+            displayName: 'Schedule At',
+            name: 'scheduledAt',
+            type: 'dateTime',
+            default: '',
+            description: 'Leave empty to publish immediately',
+            displayOptions: { show: { '/operation': ['create'], '@version': [{ _cnd: { gte: 2 } }] } },
+          },
+          {
             displayName: 'Timezone',
             name: 'timezone',
             type: 'string',
             default: '',
             placeholder: 'Europe/Belgrade',
+          },
+          {
+            displayName: 'Wait for Delivery',
+            name: 'waitForDelivery',
+            type: 'boolean',
+            default: false,
+            description:
+              'Whether to wait until the post is actually live and return the final post URL. Multi-account posts wait for every account; a failure on one account does not fail the node — each post returns its own status. Skipped for scheduled posts.',
+            displayOptions: { show: { '/operation': ['create'], '@version': [{ _cnd: { gte: 2 } }] } },
           },
         ],
       },
@@ -819,7 +918,7 @@ export class Chat33 implements INodeType {
         name: 'filters',
         type: 'collection',
         placeholder: 'Add filter',
-        displayOptions: { show: { resource: ['post'], operation: ['getMany'] } },
+        displayOptions: { show: { resource: ['post'], operation: ['getMany'], '@version': [1] } },
         default: {},
         options: [
           {
@@ -839,6 +938,68 @@ export class Chat33 implements INodeType {
             typeOptions: { minValue: 1 },
           },
           { displayName: 'Page', name: 'page', type: 'number', default: 1 },
+          {
+            displayName: 'Platform',
+            name: 'platform',
+            type: 'options',
+            options: [
+              { name: 'Facebook', value: 'facebook' },
+              { name: 'Instagram', value: 'instagram' },
+              { name: 'LinkedIn', value: 'linkedin' },
+              { name: 'TikTok', value: 'tiktok' },
+              { name: 'X (Twitter)', value: 'x' },
+              { name: 'YouTube', value: 'youtube' },
+            ],
+            default: 'instagram',
+          },
+          {
+            displayName: 'Status',
+            name: 'status',
+            type: 'options',
+            options: [
+              { name: 'Draft', value: 'draft' },
+              { name: 'Failed', value: 'failed' },
+              { name: 'Published', value: 'published' },
+              { name: 'Queued', value: 'queued' },
+              { name: 'Scheduled', value: 'scheduled' },
+            ],
+            default: 'published',
+          },
+        ],
+      },
+      {
+        displayName: 'Return All',
+        name: 'returnAll',
+        type: 'boolean',
+        displayOptions: { show: { resource: ['post'], operation: ['getMany'], '@version': [{ _cnd: { gte: 2 } }] } },
+        default: false,
+        description: 'Whether to return all results or only up to a given limit',
+      },
+      {
+        displayName: 'Limit',
+        name: 'limit',
+        type: 'number',
+        typeOptions: { minValue: 1 },
+        displayOptions: { show: { resource: ['post'], operation: ['getMany'], returnAll: [false], '@version': [{ _cnd: { gte: 2 } }] } },
+        default: 50,
+        description: 'Max number of results to return',
+      },
+      {
+        displayName: 'Filters',
+        name: 'filters',
+        type: 'collection',
+        placeholder: 'Add filter',
+        displayOptions: { show: { resource: ['post'], operation: ['getMany'], '@version': [{ _cnd: { gte: 2 } }] } },
+        default: {},
+        options: [
+          {
+            displayName: 'Account Name or ID',
+            name: 'channelId',
+            type: 'options',
+            description: 'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+            typeOptions: { loadOptionsMethod: 'getAccounts' },
+            default: '',
+          },
           {
             displayName: 'Platform',
             name: 'platform',
@@ -928,13 +1089,18 @@ export class Chat33 implements INodeType {
     const returnData: INodeExecutionData[] = [];
     const resource = this.getNodeParameter('resource', 0) as string;
     const operation = this.getNodeParameter('operation', 0) as string;
+    const isV1 = this.getNode().typeVersion < 2;
 
     for (let i = 0; i < items.length; i++) {
       try {
         let responseData: IDataObject | IDataObject[] = {};
 
         if (resource === 'account' && operation === 'getMany') {
-          const platform = this.getNodeParameter('platform', i, '') as string;
+          const platform = (
+            isV1
+              ? this.getNodeParameter('platform', i, '')
+              : ((this.getNodeParameter('accountFilters', i, {}) as IDataObject).platform ?? '')
+          ) as string;
           const res = await chat33ApiRequest.call(
             this, 'GET', '/api/v1/accounts', undefined,
             platform ? { platform } : undefined,
@@ -958,7 +1124,11 @@ export class Chat33 implements INodeType {
             text: this.getNodeParameter('text', i, '') as string,
             mediaUrls: this.getNodeParameter('mediaUrls', i, '') as string,
             scheduledAt:
-              operation === 'create' ? (this.getNodeParameter('scheduledAt', i, '') as string) : '',
+              operation !== 'create'
+                ? ''
+                : isV1
+                  ? (this.getNodeParameter('scheduledAt', i, '') as string)
+                  : ((additionalOptions.scheduledAt as string) ?? ''),
             additionalOptions,
             platformSettings: this.getNodeParameter('platformSettings', i, []) as string[],
             instagramSettings: this.getNodeParameter('instagramSettings', i, {}) as IDataObject,
@@ -976,10 +1146,15 @@ export class Chat33 implements INodeType {
           responseData = await chat33ApiRequest.call(this, 'POST', endpoint, body);
 
           const waitForDelivery =
-            operation === 'create' && (this.getNodeParameter('waitForDelivery', i, false) as boolean);
+            operation === 'create' &&
+            (isV1
+              ? (this.getNodeParameter('waitForDelivery', i, false) as boolean)
+              : additionalOptions.waitForDelivery === true);
           const createdPosts = (responseData as IDataObject)?.posts;
           if (waitForDelivery && Array.isArray(createdPosts) && createdPosts.length > 0) {
-            const maxWaitSeconds = this.getNodeParameter('waitMaxSeconds', i, 300) as number;
+            const maxWaitSeconds = isV1
+              ? (this.getNodeParameter('waitMaxSeconds', i, 300) as number)
+              : Number(additionalOptions.waitMaxSeconds ?? 300);
             const finalPosts = await waitForPostsDelivery(
               createdPosts as IDataObject[],
               { maxWaitMs: Math.max(1, maxWaitSeconds) * 1000 },
@@ -999,8 +1174,20 @@ export class Chat33 implements INodeType {
         }
         if (resource === 'post' && operation === 'getMany') {
           const filters = this.getNodeParameter('filters', i, {}) as IDataObject;
-          const res = await chat33ApiRequest.call(this, 'GET', '/api/v1/posts', undefined, filters);
-          responseData = listItems(res);
+          if (isV1) {
+            const res = await chat33ApiRequest.call(this, 'GET', '/api/v1/posts', undefined, filters);
+            responseData = listItems(res);
+          } else {
+            const returnAll = this.getNodeParameter('returnAll', i, false) as boolean;
+            const max = returnAll ? Infinity : (this.getNodeParameter('limit', i, 50) as number);
+            responseData = await collectPosts(max, (page, pageSize) =>
+              chat33ApiRequest.call(this, 'GET', '/api/v1/posts', undefined, {
+                ...filters,
+                page,
+                limit: pageSize,
+              }),
+            );
+          }
         }
         if (resource === 'post' && operation === 'delete') {
           const postId = encodeURIComponent(this.getNodeParameter('postId', i) as string);
@@ -1036,18 +1223,34 @@ export class Chat33 implements INodeType {
         }
         if (resource === 'conversation' && operation === 'getMessages') {
           const conversationId = encodeURIComponent(this.getNodeParameter('conversationId', i) as string);
-          const before = this.getNodeParameter('before', i, '') as string;
-          const res = await chat33ApiRequest.call(
-            this,
-            'GET',
-            `/api/v1/conversations/${conversationId}/messages`,
-            undefined,
-            {
-              limit: this.getNodeParameter('messageLimit', i, 30) as number,
-              ...(before ? { before: new Date(before).toISOString() } : {}),
-            },
-          );
-          responseData = Array.isArray(res.items) ? (res.items as IDataObject[]) : [];
+          if (isV1) {
+            const before = this.getNodeParameter('before', i, '') as string;
+            const res = await chat33ApiRequest.call(
+              this,
+              'GET',
+              `/api/v1/conversations/${conversationId}/messages`,
+              undefined,
+              {
+                limit: this.getNodeParameter('messageLimit', i, 30) as number,
+                ...(before ? { before: new Date(before).toISOString() } : {}),
+              },
+            );
+            responseData = Array.isArray(res.items) ? (res.items as IDataObject[]) : [];
+          } else {
+            const returnAll = this.getNodeParameter('returnAll', i, false) as boolean;
+            const max = returnAll ? Infinity : (this.getNodeParameter('limit', i, 50) as number);
+            const options = this.getNodeParameter('messageOptions', i, {}) as IDataObject;
+            const start = options.before ? new Date(options.before as string).toISOString() : undefined;
+            responseData = await collectMessages(max, start, (pageSize, before) =>
+              chat33ApiRequest.call(
+                this,
+                'GET',
+                `/api/v1/conversations/${conversationId}/messages`,
+                undefined,
+                { limit: pageSize, ...(before ? { before } : {}) },
+              ),
+            );
+          }
         }
         if (resource === 'conversation' && operation === 'reply') {
           const conversationId = encodeURIComponent(this.getNodeParameter('conversationId', i) as string);

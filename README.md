@@ -65,7 +65,8 @@ For files over 500 MB, host the file somewhere publicly reachable and use the
 ## Wait for Delivery
 
 Post → Create normally returns as soon as the post is queued — it goes live a
-minute or two later via Chat33's publisher. Turn on **Wait for Delivery** and
+minute or two later via Chat33's publisher. Turn on **Wait for Delivery** (under
+Additional Options) and
 the node polls until the post is actually live, then returns it with the final
 `externalPostUrl`, ready for the next step in your workflow.
 
@@ -77,6 +78,10 @@ the node polls until the post is actually live, then returns it with the final
 - On timeout (default 5 minutes, configurable) still-publishing posts come back
   in their current state rather than as an error — TikTok occasionally takes up
   to an hour. Pair with a `callbackUrl` if you need a guaranteed notification.
+- **Retries never post twice.** Every create carries an External Reference
+  (one per execution, run and item, or your own under Additional Options).
+  Chat33 publishes a reference once per account, so n8n's Retry On Fail gets
+  back the post it already made instead of a second copy.
 
 ## Platform settings
 

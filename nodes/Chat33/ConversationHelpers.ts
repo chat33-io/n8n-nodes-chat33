@@ -38,3 +38,49 @@ export async function collectConversations(
   } while (cursor && items.length < max);
   return items.slice(0, max);
 }
+
+/** GET /api/v1/conversations/{id}/messages and GET /api/v1/posts return at most 100 per page. */
+export const MESSAGES_PAGE_MAX = 100;
+export const POSTS_PAGE_MAX = 100;
+
+/**
+ * Pages back through a thread: each page comes oldest-first with hasMore, and
+ * the next request asks for messages before the oldest one received. Returns
+ * the most recent `max` messages (all with Infinity), oldest first.
+ */
+export async function collectMessages(
+  max: number,
+  start: string | undefined,
+  fetchPage: (pageSize: number, before?: string) => Promise<IDataObject>,
+): Promise<IDataObject[]> {
+  let items: IDataObject[] = [];
+  let before = start;
+  for (;;) {
+    const pageSize = Math.min(MESSAGES_PAGE_MAX, max - items.length);
+    const page = await fetchPage(pageSize, before);
+    const got = Array.isArray(page.items) ? (page.items as IDataObject[]) : [];
+    items = [...got, ...items];
+    const oldest = got[0]?.sentAt;
+    if (!page.hasMore || got.length === 0 || typeof oldest !== 'string' || oldest === before) break;
+    if (items.length >= max) break;
+    before = oldest;
+  }
+  return Number.isFinite(max) ? items.slice(-max) : items;
+}
+
+/** Walks GET /api/v1/posts pages until `max` posts or hasMore is false. */
+export async function collectPosts(
+  max: number,
+  fetchPage: (page: number, pageSize: number) => Promise<IDataObject>,
+): Promise<IDataObject[]> {
+  const items: IDataObject[] = [];
+  // A fixed page size keeps page numbers stable while we walk them.
+  const pageSize = Number.isFinite(max) ? Math.min(POSTS_PAGE_MAX, Math.max(1, max)) : POSTS_PAGE_MAX;
+  for (let page = 1; ; page++) {
+    const res = await fetchPage(page, pageSize);
+    const got = Array.isArray(res.items) ? (res.items as IDataObject[]) : [];
+    items.push(...got);
+    if (!res.hasMore || got.length === 0 || items.length >= max) break;
+  }
+  return Number.isFinite(max) ? items.slice(0, max) : items;
+}
